@@ -21,7 +21,6 @@ api_hash = '72af30fe5dd18997fc50a0a53e544f0c'
 CHAT_ID = -1003732799535
 CHAT_META = -1003771916049
 
-# Leer la sesión desde las variables de entorno de Render
 SESSION_STR = os.environ.get("TELETHON_SESSION", "")
 
 COMANDO_BIOMETRICO = '/facial'
@@ -39,10 +38,8 @@ CARPETA_UPLOADS = 'uploads'
 os.makedirs(CARPETA_DESCARGAS, exist_ok=True)
 os.makedirs(CARPETA_UPLOADS, exist_ok=True)
 
-# Iniciar cliente con StringSession
 client = TelegramClient(StringSession(SESSION_STR), api_id, api_hash)
 
-# Diccionarios
 solicitudes = {}
 solicitudes_facial2 = {}
 solicitudes_meta = {}
@@ -51,7 +48,6 @@ solicitudes_sentinel = {}
 solicitudes_metaplaca = {}
 solicitudes_dminsa = {}
 
-# Colas
 cola_envios = Queue()
 cola_facial2 = Queue()
 cola_meta = Queue()
@@ -60,7 +56,6 @@ cola_sentinel = Queue()
 cola_metaplaca = Queue()
 cola_dminsa = Queue()
 
-# Resultados
 resultados_envios = {}
 resultados_facial2 = {}
 resultados_meta = {}
@@ -209,7 +204,6 @@ async def handler_facial(event):
             ruta = await event.download_media(file=CARPETA_DESCARGAS)
             sol['archivo'] = os.path.basename(ruta)
             sol['tipo_archivo'] = 'PDF'
-            print(f"   → PDF facial2 guardado: {ruta}")
         except Exception as e:
             sol['error'] = str(e)
         marcar_completado(sol)
@@ -275,16 +269,13 @@ async def handler_dminsa(event):
         try: await client.delete_messages(CHAT_ID, [sol['mensaje_original_id']])
         except: pass
 
-    if texto.strip():
-        sol['texto_respuesta'] = texto
-        print("   → Texto de respuesta guardado")
+    if texto.strip(): sol['texto_respuesta'] = texto
     
     if es_pdf(event):
         try:
             ruta = await event.download_media(file=CARPETA_DESCARGAS)
             sol['archivo'] = os.path.basename(ruta)
             sol['tipo_archivo'] = 'PDF'
-            print(f"   → PDF dminsa guardado: {ruta}")
         except Exception as e:
             sol['error'] = str(e)
         marcar_completado(sol)
@@ -828,7 +819,8 @@ def nm_txt(nombre):
 # ARRANQUE Y PING AUTOMÁTICO
 # ============================================
 def run_flask():
-    app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
 
 async def main():
     global MI_ID
@@ -858,20 +850,20 @@ def ping_automatico():
         while True:
             try:
                 requests.get(url, timeout=10)
-                print("✅ Ping enviado (manteniendo vivo el servicio)")
+                print("✅ Ping enviado")
             except Exception as e:
                 print(f"⚠️ Error ping: {e}")
             time.sleep(600)
 
 if __name__ == '__main__':
+    # 1. Arrancamos el "ping" para que Render no apague el bot
     if os.environ.get('RENDER_EXTERNAL_URL'):
-        print("☁️ Detectado entorno Render. Iniciando ping automático...")
         threading.Thread(target=ping_automatico, daemon=True).start()
-        with client:
-            client.loop.run_until_complete(main())
-    else:
-        print("💻 Iniciando entorno local...")
-        flask_thread = threading.Thread(target=run_flask, daemon=True)
-        flask_thread.start()
-        with client:
-            client.loop.run_until_complete(main())
+
+    # 2. Arrancamos Flask (la página web) en un hilo aparte
+    flask_thread = threading.Thread(target=run_flask, daemon=True)
+    flask_thread.start()
+
+    # 3. Arrancamos el bot de Telegram
+    with client:
+        client.loop.run_until_complete(main())
