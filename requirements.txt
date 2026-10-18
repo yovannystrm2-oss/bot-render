@@ -1,0 +1,6 @@
+Flask
+flask-cors
+telethon
+gunicorn
+werkzeug
+requests
