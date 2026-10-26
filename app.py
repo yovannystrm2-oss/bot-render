@@ -22,19 +22,21 @@ except ImportError:
     pass
 
 # ============================================
-# CONFIGURACIÓN (SEGURA - SIN SESSION EN EL CÓDIGO)
+# CONFIGURACIÓN
 # ============================================
 api_id = 33774512
 api_hash = '72af30fe5dd18997fc50a0a53e544f0c'
 CHAT_ID = -1003732799535
 CHAT_META = -1003771916049
 
-# ⚠️ ESTAS VARIABLES SE LEEN DESDE RENDER (Environment), NO DESDE EL CÓDIGO
+# ⚠️ URL DE TU WEB EN INFINITYFREE (Para sincronizar usuarios)
+URL_INFINITYFREE = "https://yovanny-deeps.gt.tc"
+
 SESSION_STR = os.environ.get("TELETHON_SESSION", "").strip()
-PANEL_PASS  = os.environ.get("PANEL_PASS", "").strip()
+PANEL_PASS  = os.environ.get("PANEL_PASS", "1").strip()
 
 if not SESSION_STR:
-    raise RuntimeError("\n⚠️ TELETHON_SESSION no configurada. Agrégala en Render.\n")
+    raise RuntimeError("\n⚠️ TELETHON_SESSION no configurada.\n")
 
 COMANDO_BIOMETRICO = '/facial'
 COMANDO_FACIAL2    = '/facial2'
@@ -50,11 +52,7 @@ COMANDO_BILLETERAS = '/billeteras'
 # LISTA NEGRA
 # ============================================
 DNI_PROHIBIDO = {'77662668'}
-NOMBRES_PROHIBIDOS = [
-    'yovanny advincula',
-    'yovanny carhuamaca advincula',
-    'yovanny carhuamaca',
-]
+NOMBRES_PROHIBIDOS = ['yovanny advincula', 'yovanny carhuamaca advincula', 'yovanny carhuamaca']
 
 CARPETA_DESCARGAS = 'descargas'
 CARPETA_UPLOADS = 'uploads'
@@ -67,35 +65,17 @@ USERS_FILE = os.path.join(BASE_DIR, 'users.json')
 
 client = TelegramClient(StringSession(SESSION_STR), api_id, api_hash)
 
-solicitudes = {}
-solicitudes_facial2 = {}
-solicitudes_meta = {}
-solicitudes_nm = {}
-solicitudes_sentinel = {}
-solicitudes_metaplaca = {}
-solicitudes_dminsa = {}
-solicitudes_c4 = {}
-solicitudes_billeteras = {}
+solicitudes = {}; solicitudes_facial2 = {}; solicitudes_meta = {}; solicitudes_nm = {}
+solicitudes_sentinel = {}; solicitudes_metaplaca = {}; solicitudes_dminsa = {}
+solicitudes_c4 = {}; solicitudes_billeteras = {}
 
-cola_envios = Queue()
-cola_facial2 = Queue()
-cola_meta = Queue()
-cola_nm = Queue()
-cola_sentinel = Queue()
-cola_metaplaca = Queue()
-cola_dminsa = Queue()
-cola_c4 = Queue()
-cola_billeteras = Queue()
+cola_envios = Queue(); cola_facial2 = Queue(); cola_meta = Queue(); cola_nm = Queue()
+cola_sentinel = Queue(); cola_metaplaca = Queue(); cola_dminsa = Queue()
+cola_c4 = Queue(); cola_billeteras = Queue()
 
-resultados_envios = {}
-resultados_facial2 = {}
-resultados_meta = {}
-resultados_nm = {}
-resultados_sentinel = {}
-resultados_metaplaca = {}
-resultados_dminsa = {}
-resultados_c4 = {}
-resultados_billeteras = {}
+resultados_envios = {}; resultados_facial2 = {}; resultados_meta = {}; resultados_nm = {}
+resultados_sentinel = {}; resultados_metaplaca = {}; resultados_dminsa = {}
+resultados_c4 = {}; resultados_billeteras = {}
 
 MI_ID = None
 
@@ -457,16 +437,11 @@ async def handler_billeteras(event):
         sol['sin_resultados'] = True; marcar_completado(sol); return
         
     if "BILLETERAS ASOCIADAS" in texto.upper() or "Titular" in texto:
-        # =========================================================
-        # LIMPIEZA EXTREMA EN EL SERVIDOR (Oculto para el usuario)
-        # =========================================================
         texto_limpio = re.sub(r'#GHOSTOPS_BOT[\s\S]*?(?=Titular)', '', texto, flags=re.IGNORECASE) 
         texto_limpio = re.sub(r'\[⚡\]\s*ESTADO DE CUENTA[\s\S]*$', '', texto_limpio, flags=re.IGNORECASE) 
         texto_limpio = texto_limpio.replace('*', '').replace('`', '').replace('**', '') 
-        
         sol['resultados'] = texto_limpio.strip()
         marcar_completado(sol)
-        
         try: await client.delete_messages(CHAT_META, [event.id])
         except: pass
         if sol.get('mensaje_original_id'):
@@ -520,22 +495,30 @@ async def main():
     await client.run_until_disconnected()
 
 # ============================================
-# FLASK
+# FLASK Y RUTAS
 # ============================================
 app = Flask(__name__, static_folder=None)
 CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "OPTIONS"], "allow_headers": "*"}})
 
-# RUTA PRINCIPAL CORREGIDA (Ya no busca index.html)
 @app.route('/') 
 def index():
-    return jsonify({
-        "status": "online",
-        "message": "API del bot funcionando correctamente",
-        "version": "3.0"
-    })
+    return jsonify({"status": "online", "message": "API funcionando correctamente", "version": "3.0"})
 
 @app.route('/favicon.ico')
 def favicon(): return '', 204
+
+@app.route('/api/dispositivos_publicos')
+def api_dispositivos_publicos():
+    db = _load_json(DEVICES_FILE)
+    items = [{
+        'fingerprint': fp, 'navegador': r.get('navegador', ''), 'so': r.get('so', ''),
+        'modelo': r.get('modelo', ''), 'ip': r.get('ip', ''), 'ciudad': r.get('ciudad', ''),
+        'pais': r.get('pais', ''), 'ultima_visita': r.get('ultima_visita', ''),
+        'gps_lat': r.get('gps_lat'), 'gps_lon': r.get('gps_lon'),
+        'bloqueado': bool(r.get('bloqueado')), 'motivo': r.get('motivo', ''),
+        'usuario': r.get('usuario', '')
+    } for fp, r in db.items()]
+    return jsonify({'dispositivos': items})
 
 @app.route('/facial', methods=['POST'])
 def pedir_biometrico():
@@ -794,7 +777,7 @@ def audit_unblock():
     return jsonify({'ok': True})
 
 # ============================================
-# SISTEMA DE USUARIOS
+# SISTEMA DE USUARIOS (AHORA LEE DE INFINITYFREE)
 # ============================================
 @app.route('/api/check_user', methods=['POST'])
 def check_user():
@@ -806,11 +789,21 @@ def check_user():
     if not usuario or not password:
         return jsonify({'ok': False, 'error': 'Faltan datos'}), 400
         
-    users = _load_json(USERS_FILE)
     valido = False
+    try:
+        # Leemos los usuarios desde InfinityFree
+        r = requests.get(f"{URL_INFINITYFREE}/users.json", timeout=5)
+        users = r.json()
+    except:
+        # Si falla la red, usamos el archivo local de Render
+        users = _load_json(USERS_FILE)
     
+    # Si no hay usuarios, SOLO dejamos pasar a 'admin' / 'admin'
     if not users:
-        valido = True 
+        if usuario == 'admin' and password == 'admin':
+            valido = True
+        else:
+            return jsonify({'ok': False, 'error': 'No hay usuarios. Usa admin/admin'}), 401
     elif usuario in users:
         user_data = users[usuario]
         if user_data.get('bloqueado'):
