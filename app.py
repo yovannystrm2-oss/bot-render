@@ -22,18 +22,19 @@ except ImportError:
     pass
 
 # ============================================
-# CONFIGURACIÓN
+# CONFIGURACIÓN (SEGURA - SIN SESSION EN EL CÓDIGO)
 # ============================================
 api_id = 33774512
 api_hash = '72af30fe5dd18997fc50a0a53e544f0c'
 CHAT_ID = -1003732799535
 CHAT_META = -1003771916049
 
-SESSION_STR = os.environ.get("TELETHON_SESSION", "1AZWarzwBu6uxsF-V2dmYrNrbeUl4AXOZul8F7J-zpNmeOm5r8fEUfJQV4G4PC4XHUA-ccSX4Qz5RMpPZxzp_XCtQRlG_sYrgUnDAlrqtVSHjk5mR1guZYnrsmjP527CSxIfZiy114_K2U9BGjoGpoT9W0u_w0rEkV_zeyNX_gWi0rGidcPoy9li332SqeisMUFYg5HRyvjlZeqTEFNbzZODm5tiiMmiXmrl59e0s0iG4WSoyaJ7pMB-zqdY2NpQH8A-PLbT6-FDp-xKwl_HKI1h2brgWe1rxxnQWhEuEzhAEFnX-VaAf4BV3UKWYZDD0mI49aBIK0CgkzgYgenEvz5qUDWYhla0=").strip()
-PANEL_PASS  = os.environ.get("PANEL_PASS", "1").strip()
+# ⚠️ ESTAS VARIABLES SE LEEN DESDE RENDER (Environment), NO DESDE EL CÓDIGO
+SESSION_STR = os.environ.get("TELETHON_SESSION", "").strip()
+PANEL_PASS  = os.environ.get("PANEL_PASS", "").strip()
 
 if not SESSION_STR:
-    raise RuntimeError("\n⚠️ TELETHON_SESSION no configurada.\n")
+    raise RuntimeError("\n⚠️ TELETHON_SESSION no configurada. Agrégala en Render.\n")
 
 COMANDO_BIOMETRICO = '/facial'
 COMANDO_FACIAL2    = '/facial2'
@@ -524,19 +525,14 @@ async def main():
 app = Flask(__name__, static_folder=None)
 CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "OPTIONS"], "allow_headers": "*"}})
 
-INDEX_PATH = os.path.join(BASE_DIR, 'index.html')
-
+# RUTA PRINCIPAL CORREGIDA (Ya no busca index.html)
 @app.route('/') 
 def index():
-    try:
-        with open(INDEX_PATH, 'r', encoding='utf-8') as f: return f.read()
-    except: return "index.html no encontrado", 404
-
-@app.route('/css/<path:nombre>')
-def servir_css(nombre): return send_from_directory(os.path.join(BASE_DIR, 'css'), nombre)
-
-@app.route('/js/<path:nombre>')
-def servir_js(nombre): return send_from_directory(os.path.join(BASE_DIR, 'js'), nombre)
+    return jsonify({
+        "status": "online",
+        "message": "API del bot funcionando correctamente",
+        "version": "3.0"
+    })
 
 @app.route('/favicon.ico')
 def favicon(): return '', 204
@@ -798,7 +794,7 @@ def audit_unblock():
     return jsonify({'ok': True})
 
 # ============================================
-# SISTEMA DE USUARIOS (AQUÍ SE GUARDA EL NOMBRE)
+# SISTEMA DE USUARIOS
 # ============================================
 @app.route('/api/check_user', methods=['POST'])
 def check_user():
