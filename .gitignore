@@ -1,1 +1,13 @@
-
+__pycache__/
+*.pyc
+.env
+sesion_telegram.txt
+sesion_peliculas.session
+uploads/
+descargas/
+devices.json
+users.json
+debug.php
+lib/
+css/
+js/
