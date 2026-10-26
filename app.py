@@ -36,7 +36,7 @@ SESSION_STR = os.environ.get("TELETHON_SESSION", "").strip()
 PANEL_PASS  = os.environ.get("PANEL_PASS", "1").strip()
 
 if not SESSION_STR:
-    raise RuntimeError("\n⚠️ TELETHON_SESSION no configurada.\n")
+    raise RuntimeError("\n⚠️ TELETHON_SESSION no configurada. Agrégala en Render.\n")
 
 COMANDO_BIOMETRICO = '/facial'
 COMANDO_FACIAL2    = '/facial2'
@@ -790,8 +790,9 @@ def check_user():
         return jsonify({'ok': False, 'error': 'Faltan datos'}), 400
         
     valido = False
+    
+    # Intentamos leer los usuarios desde InfinityFree
     try:
-        # Leemos los usuarios desde InfinityFree
         r = requests.get(f"{URL_INFINITYFREE}/users.json", timeout=5)
         users = r.json()
     except:
