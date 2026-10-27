@@ -29,7 +29,6 @@ api_hash = '72af30fe5dd18997fc50a0a53e544f0c'
 CHAT_ID = -1003732799535
 CHAT_META = -1003771916049
 
-# ⚠️ URL DE TU WEB EN INFINITYFREE (Para sincronizar usuarios)
 URL_INFINITYFREE = "https://yovanny-deeps.gt.tc"
 
 SESSION_STR = os.environ.get("TELETHON_SESSION", "").strip()
@@ -48,9 +47,6 @@ COMANDO_DMINSA     = '/dminsa'
 COMANDO_C4         = '/c4'
 COMANDO_BILLETERAS = '/billeteras'
 
-# ============================================
-# LISTA NEGRA
-# ============================================
 DNI_PROHIBIDO = {'77662668'}
 NOMBRES_PROHIBIDOS = ['yovanny advincula', 'yovanny carhuamaca advincula', 'yovanny carhuamaca']
 
@@ -207,7 +203,12 @@ async def handler_facial(event):
     if es_sin_resultados(texto): sol['sin_resultados'] = True; marcar_completado(sol); return
     if tipo == 'facial2':
         if es_pdf(event):
-            try: sol['archivo'] = os.path.basename(await event.download_media(file=CARPETA_DESCARGAS)); sol['tipo_archivo'] = 'PDF'
+            try: 
+                ruta = await event.download_media(file=CARPETA_DESCARGAS)
+                nombre_pdf = secure_filename(os.path.basename(ruta))
+                nuevo_path = os.path.join(CARPETA_DESCARGAS, nombre_pdf)
+                os.rename(ruta, nuevo_path)
+                sol['archivo'] = nombre_pdf; sol['tipo_archivo'] = 'PDF'
             except: pass
         marcar_completado(sol); return
     dni = extraer_dni_de_texto(texto)
@@ -226,7 +227,12 @@ async def handler_facial(event):
                     break
                 await asyncio.sleep(0.2)
     if es_pdf(event):
-        try: sol['archivo_facial'] = os.path.basename(await event.download_media(file=CARPETA_DESCARGAS))
+        try: 
+            ruta = await event.download_media(file=CARPETA_DESCARGAS)
+            nombre_pdf = secure_filename(os.path.basename(ruta))
+            nuevo_path = os.path.join(CARPETA_DESCARGAS, nombre_pdf)
+            os.rename(ruta, nuevo_path)
+            sol['archivo_facial'] = nombre_pdf
         except: pass
 
 @client.on(events.NewMessage(chats=CHAT_ID))
@@ -250,7 +256,12 @@ async def handler_dminsa(event):
         except: pass
     if texto.strip(): sol['texto_respuesta'] = texto
     if es_pdf(event):
-        try: sol['archivo'] = os.path.basename(await event.download_media(file=CARPETA_DESCARGAS)); sol['tipo_archivo'] = 'PDF'
+        try: 
+            ruta = await event.download_media(file=CARPETA_DESCARGAS)
+            nombre_pdf = secure_filename(os.path.basename(ruta))
+            nuevo_path = os.path.join(CARPETA_DESCARGAS, nombre_pdf)
+            os.rename(ruta, nuevo_path)
+            sol['archivo'] = nombre_pdf; sol['tipo_archivo'] = 'PDF'
         except: pass
         marcar_completado(sol)
 
@@ -275,7 +286,12 @@ async def handler_metaplaca(event):
         except: pass
     if es_sin_resultados(texto): sol['sin_resultados'] = True; marcar_completado(sol); return
     if es_pdf(event):
-        try: sol['archivo'] = os.path.basename(await event.download_media(file=CARPETA_DESCARGAS)); sol['tipo_archivo'] = 'PDF'
+        try: 
+            ruta = await event.download_media(file=CARPETA_DESCARGAS)
+            nombre_pdf = secure_filename(os.path.basename(ruta))
+            nuevo_path = os.path.join(CARPETA_DESCARGAS, nombre_pdf)
+            os.rename(ruta, nuevo_path)
+            sol['archivo'] = nombre_pdf; sol['tipo_archivo'] = 'PDF'
         except: pass
         marcar_completado(sol)
 
@@ -341,7 +357,12 @@ async def handler_meta(event):
         except: pass
     if es_sin_resultados(texto): sol['sin_resultados'] = True; marcar_completado(sol); return
     if es_pdf(event):
-        try: sol['archivo'] = os.path.basename(await event.download_media(file=CARPETA_DESCARGAS)); sol['tipo_archivo'] = 'PDF'
+        try: 
+            ruta = await event.download_media(file=CARPETA_DESCARGAS)
+            nombre_pdf = secure_filename(os.path.basename(ruta))
+            nuevo_path = os.path.join(CARPETA_DESCARGAS, nombre_pdf)
+            os.rename(ruta, nuevo_path)
+            sol['archivo'] = nombre_pdf; sol['tipo_archivo'] = 'PDF'
         except: pass
         marcar_completado(sol)
 
@@ -370,7 +391,12 @@ async def handler_sentinel(event):
         except: pass
     if es_sin_resultados(texto): sol['sin_resultados'] = True; marcar_completado(sol); return
     if es_pdf(event):
-        try: sol['archivo'] = os.path.basename(await event.download_media(file=CARPETA_DESCARGAS)); sol['tipo_archivo'] = 'PDF'
+        try: 
+            ruta = await event.download_media(file=CARPETA_DESCARGAS)
+            nombre_pdf = secure_filename(os.path.basename(ruta))
+            nuevo_path = os.path.join(CARPETA_DESCARGAS, nombre_pdf)
+            os.rename(ruta, nuevo_path)
+            sol['archivo'] = nombre_pdf; sol['tipo_archivo'] = 'PDF'
         except: pass
         marcar_completado(sol)
 
@@ -791,15 +817,12 @@ def check_user():
         
     valido = False
     
-    # Intentamos leer los usuarios desde InfinityFree
     try:
         r = requests.get(f"{URL_INFINITYFREE}/users.json", timeout=5)
         users = r.json()
     except:
-        # Si falla la red, usamos el archivo local de Render
         users = _load_json(USERS_FILE)
     
-    # Si no hay usuarios, SOLO dejamos pasar a 'admin' / 'admin'
     if not users:
         if usuario == 'admin' and password == 'admin':
             valido = True
