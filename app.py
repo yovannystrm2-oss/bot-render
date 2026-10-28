@@ -46,6 +46,7 @@ COMANDO_SENTINEL   = '/sentinel'
 COMANDO_DMINSA     = '/dminsa'
 COMANDO_C4         = '/c4'
 COMANDO_BILLETERAS = '/billeteras'
+COMANDO_FAMIVI     = '/famivi'
 
 DNI_PROHIBIDO = {'77662668'}
 NOMBRES_PROHIBIDOS = ['yovanny advincula', 'yovanny carhuamaca advincula', 'yovanny carhuamaca']
@@ -63,15 +64,15 @@ client = TelegramClient(StringSession(SESSION_STR), api_id, api_hash)
 
 solicitudes = {}; solicitudes_facial2 = {}; solicitudes_meta = {}; solicitudes_nm = {}
 solicitudes_sentinel = {}; solicitudes_metaplaca = {}; solicitudes_dminsa = {}
-solicitudes_c4 = {}; solicitudes_billeteras = {}
+solicitudes_c4 = {}; solicitudes_billeteras = {}; solicitudes_famivi = {}
 
 cola_envios = Queue(); cola_facial2 = Queue(); cola_meta = Queue(); cola_nm = Queue()
 cola_sentinel = Queue(); cola_metaplaca = Queue(); cola_dminsa = Queue()
-cola_c4 = Queue(); cola_billeteras = Queue()
+cola_c4 = Queue(); cola_billeteras = Queue(); cola_famivi = Queue()
 
 resultados_envios = {}; resultados_facial2 = {}; resultados_meta = {}; resultados_nm = {}
 resultados_sentinel = {}; resultados_metaplaca = {}; resultados_dminsa = {}
-resultados_c4 = {}; resultados_billeteras = {}
+resultados_c4 = {}; resultados_billeteras = {}; resultados_famivi = {}
 
 MI_ID = None
 
@@ -475,6 +476,45 @@ async def handler_billeteras(event):
             except: pass
 
 # ============================================
+# HANDLER FAMIVI (NUEVO)
+# ============================================
+@client.on(events.NewMessage(chats=CHAT_ID))
+async def handler_famivi(event):
+    if event.sender_id == MI_ID: return
+    texto = event.text or ''; sol = None
+    if event.reply_to_msg_id and event.reply_to_msg_id in solicitudes_famivi: sol = solicitudes_famivi[event.reply_to_msg_id]
+    if sol is None:
+        m = re.search(r'\b(\d{8})\b', texto)
+        if m:
+            if dni_bloqueado(m.group(1)):
+                try: await client.delete_messages(CHAT_ID, [event.id])
+                except: pass
+                return
+            pend = [x for x in solicitudes_famivi.values() if not x['completado'] and x.get('dni') == m.group(1)]
+            if pend: sol = max(pend, key=lambda x: x['fecha'])
+    if sol is None or sol.get('completado'): return
+    
+    if es_sin_resultados(texto):
+        try: await client.delete_messages(CHAT_ID, [event.id])
+        except: pass
+        sol['sin_resultados'] = True; marcar_completado(sol); return
+        
+    if es_pdf(event):
+        try: 
+            ruta = await event.download_media(file=CARPETA_DESCARGAS)
+            nombre_pdf = secure_filename(os.path.basename(ruta))
+            nuevo_path = os.path.join(CARPETA_DESCARGAS, nombre_pdf)
+            os.rename(ruta, nuevo_path)
+            sol['archivo'] = nombre_pdf; sol['tipo_archivo'] = 'PDF'
+        except: pass
+        marcar_completado(sol)
+        try: await client.delete_messages(CHAT_ID, [event.id])
+        except: pass
+        if sol.get('mensaje_original_id'):
+            try: await client.delete_messages(CHAT_ID, [sol['mensaje_original_id']])
+            except: pass
+
+# ============================================
 # WORKERS (Colas)
 # ============================================
 async def worker(cola, resultados, tipo, funcion_envio):
@@ -507,11 +547,12 @@ async def main():
     asyncio.create_task(worker(cola_dminsa, resultados_dminsa, 'dminsa', lambda i: client.send_message(CHAT_ID, i['comando'])))
     asyncio.create_task(worker(cola_c4, resultados_c4, 'c4', lambda i: client.send_message(CHAT_ID, f"{COMANDO_C4} {i['dni']}")))
     asyncio.create_task(worker(cola_billeteras, resultados_billeteras, 'billeteras', lambda i: client.send_message(CHAT_META, f"{COMANDO_BILLETERAS} {i['telefono']}")))
+    asyncio.create_task(worker(cola_famivi, resultados_famivi, 'famivi', lambda i: client.send_message(CHAT_ID, f"{COMANDO_FAMIVI} {i['dni']}")))
 
     async def _loop_limpieza():
         while True:
             ahora = time.time()
-            for store in (solicitudes, solicitudes_facial2, solicitudes_meta, solicitudes_nm, solicitudes_sentinel, solicitudes_metaplaca, solicitudes_dminsa, solicitudes_c4, solicitudes_billeteras):
+            for store in (solicitudes, solicitudes_facial2, solicitudes_meta, solicitudes_nm, solicitudes_sentinel, solicitudes_metaplaca, solicitudes_dminsa, solicitudes_c4, solicitudes_billeteras, solicitudes_famivi):
                 for k in list(store.keys()):
                     try:
                         if ahora - datetime.fromisoformat(store[k]['fecha']).timestamp() > 3600: del store[k]
@@ -732,6 +773,27 @@ def pedir_billeteras():
 def ver_estado_billeteras(message_id):
     sol = solicitudes_billeteras.get(message_id); return jsonify(sol) if sol else (jsonify({'error': 'No encontrado'}), 404)
 
+@app.route('/famivi', methods=['POST'])
+def pedir_famivi():
+    data = request.get_json(silent=True) or request.form; dni = (data.get('dni') or '').strip()
+    if not dni or not re.fullmatch(r'\d{8}', dni): return jsonify({'error': 'DNI inválido'}), 400
+    if dni_bloqueado(dni): return jsonify({'error': 'DNI bloqueado'}), 403
+    request_id = str(uuid.uuid4()); cola_famivi.put({'request_id': request_id, 'dni': dni})
+    inicio = time.time()
+    while time.time() - inicio < 60:
+        if request_id in resultados_famivi:
+            r = resultados_famivi.pop(request_id)
+            if r['ok']:
+                solicitudes_famivi[r['message_id']] = {'tipo': 'famivi', 'dni': dni, 'completado': False, 'archivo': None, 'tipo_archivo': None, 'sin_resultados': False, 'fecha': datetime.now().isoformat(), 'mensaje_original_id': r['message_id']}
+                return jsonify({'success': True, 'message_id': r['message_id']})
+            return jsonify({'error': r['error']}), 500
+        time.sleep(0.2)
+    return jsonify({'error': 'Timeout'}), 500
+
+@app.route('/famivi_estado/<int:message_id>')
+def ver_estado_famivi(message_id):
+    sol = solicitudes_famivi.get(message_id); return jsonify(sol) if sol else (jsonify({'error': 'No encontrado'}), 404)
+
 @app.route('/archivo/<path:nombre>')
 def servir_archivo(nombre): return send_from_directory(CARPETA_DESCARGAS, nombre)
 
@@ -803,7 +865,7 @@ def audit_unblock():
     return jsonify({'ok': True})
 
 # ============================================
-# SISTEMA DE USUARIOS (AHORA LEE DE INFINITYFREE)
+# SISTEMA DE USUARIOS
 # ============================================
 @app.route('/api/check_user', methods=['POST'])
 def check_user():
